@@ -1,1 +1,252 @@
+// 診断の質問データ
+const questions = [
+    {
+        question: "新しい環境や変化に対して、どのように感じますか？",
+        options: [
+            { text: "非常にワクワクし、積極的に飛び込む", score: { adaptability: 3, novelty: 2 } },
+            { text: "変化は良い刺激だと思うが、慎重に進める", score: { adaptability: 1, novelty: 1 } },
+            { text: "どちらともいえない。状況による", score: { adaptability: 0, novelty: 0 } },
+            { text: "できれば慣れた環境にいたい", score: { adaptability: -1, novelty: -1 } },
+            { text: "変化はストレスで、避けたい", score: { adaptability: -3, novelty: -2 } }
+        ]
+    },
+    {
+        question: "チームやプロジェクトをまとめる役割は得意ですか？",
+        options: [
+            { text: "非常に得意で、率先してリーダーを務める", score: { leadership: 3, collaboration: 1 } },
+            { text: "得意。チームをまとめるのは好きだ", score: { leadership: 2, collaboration: 1 } },
+            { text: "普通。機会があればやってみる", score: { leadership: 0, collaboration: 0 } },
+            { text: "あまり得意ではない。サポート役に回りたい", score: { leadership: -1, collaboration: 0 } },
+            { text: "苦手。指示されたことを着実にこなしたい", score: { leadership: -2, collaboration: 0 } }
+        ]
+    },
+    {
+        question: "未経験の分野でも、学び直して挑戦することに意欲はありますか？",
+        options: [
+            { text: "非常に意欲がある。常に新しい知識を吸収したい", score: { learning: 3, adaptability: 2 } },
+            { text: "意欲はある。必要なら喜んで学ぶ", score: { learning: 1, adaptability: 1 } },
+            { text: "機会があれば学ぶが、特別に求めてはいない", score: { learning: 0, adaptability: 0 } },
+            { text: "できれば慣れた知識や経験を活かしたい", score: { learning: -1, adaptability: -1 } },
+            { text: "新しいことを学ぶのは億劫だ", score: { learning: -2, adaptability: -2 } }
+        ]
+    },
+    {
+        question: "困難な問題に直面したとき、どのように対処しますか？",
+        options: [
+            { text: "冷静に分析し、論理的に解決策を探す", score: { problemSolving: 3, analytical: 2 } },
+            { text: "周囲と協力し、意見を出し合って解決する", score: { problemSolving: 2, collaboration: 1 } },
+            { text: "経験に基づいて、過去の成功例からヒントを得る", score: { problemSolving: 1, experience: 1 } },
+            { text: "一旦立ち止まり、情報収集に時間をかける", score: { problemSolving: 0, analytical: 0 } },
+            { text: "誰かに相談し、指示を仰ぐことが多い", score: { problemSolving: -1, collaboration: -1 } }
+        ]
+    },
+    {
+        question: "自身の専門外の部署や、若手社員とも積極的に交流したいと思いますか？",
+        options: [
+            { text: "非常にそう思う。多様な意見を尊重したい", score: { collaboration: 3, communication: 2 } },
+            { text: "そう思う。新しい視点を得ることは重要だ", score: { collaboration: 2, communication: 1 } },
+            { text: "どちらともいえない。必要であれば交流する", score: { collaboration: 0, communication: 0 } },
+            { text: "あまりそう思わない。自分の業務に集中したい", score: { collaboration: -1, communication: -1 } },
+            { text: "苦手だ。異なる世代との交流は避けたい", score: { collaboration: -2, communication: -2 } }
+        ]
+    }
+];
 
+// 現在の質問インデックスとスコア、回答履歴
+let currentQuestionIndex = 0;
+let scores = {
+    adaptability: 0,       // 変化への適応力
+    novelty: 0,            // 新しいことへの関心
+    leadership: 0,         // リーダーシップ
+    collaboration: 0,      // 協調性
+    learning: 0,           // 学習意欲
+    problemSolving: 0,     // 問題解決能力
+    analytical: 0,         // 分析力
+    communication: 0       // コミュニケーション能力
+};
+const userAnswers = []; // 各質問で選択したオプションのインデックスを保存
+
+// DOM要素の取得
+const quizArea = document.getElementById('quiz-area');
+const resultArea = document.getElementById('result-area');
+const questionContainer = document.getElementById('questionContainer');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const progressBarFill = document.getElementById('progressBarFill');
+
+/**
+ * 質問を読み込み、表示する
+ */
+function loadQuestion() {
+    if (currentQuestionIndex >= questions.length) {
+        showResult(); // 全ての質問に答え終わったら結果表示
+        return;
+    }
+
+    const q = questions[currentQuestionIndex];
+    questionContainer.innerHTML = `
+        <p class="question-text">Q${currentQuestionIndex + 1}. ${q.question}</p>
+        <ul class="option-list">
+            ${q.options.map((option, index) => `
+                <li>
+                    <button class="question-option" data-option-index="${index}">
+                        ${option.text}
+                    </button>
+                </li>
+            `).join('')}
+        </ul>
+    `;
+
+    // 過去にこの質問で選択した回答があれば、そのボタンをハイライト
+    if (userAnswers[currentQuestionIndex] !== undefined) {
+        const selectedOptionIndex = userAnswers[currentQuestionIndex].optionIndex;
+        questionContainer.querySelector(`[data-option-index="${selectedOptionIndex}"]`).classList.add('selected');
+    }
+
+    addOptionClickListeners(); // 選択肢ボタンにイベントリスナーを設定
+    updateNavigationButtons(); // ナビゲーションボタンの状態を更新
+    updateProgressBar(); // プログレスバーを更新
+}
+
+/**
+ * 選択肢ボタンにクリックイベントリスナーを追加する
+ */
+function addOptionClickListeners() {
+    document.querySelectorAll('.question-option').forEach(button => {
+        button.addEventListener('click', (event) => {
+            // 他の選択肢のハイライトを解除
+            document.querySelectorAll('.question-option').forEach(btn => btn.classList.remove('selected'));
+            // クリックされたボタンをハイライト
+            event.target.classList.add('selected');
+            
+            const optionIndex = parseInt(event.target.dataset.option-index);
+            // ユーザーの回答を記録 (既存の回答を上書き)
+            userAnswers[currentQuestionIndex] = {
+                questionIndex: currentQuestionIndex,
+                optionIndex: optionIndex,
+                score: questions[currentQuestionIndex].options[optionIndex].score
+            };
+            updateNavigationButtons(); // 選択されたら「次へ」ボタンが有効になるよう更新
+        });
+    });
+}
+
+/**
+ * 「前へ」「次へ」ボタンの状態を更新する
+ */
+function updateNavigationButtons() {
+    prevBtn.disabled = currentQuestionIndex === 0; // 最初の質問なら「前へ」を無効化
+    
+    // 現在の質問に回答が選択されていなければ「次へ」を無効化
+    nextBtn.disabled = userAnswers[currentQuestionIndex] === undefined;
+
+    // 最後の質問なら「次へ」のテキストを「結果を見る」に変更
+    if (currentQuestionIndex === questions.length - 1 && userAnswers[currentQuestionIndex] !== undefined) {
+         nextBtn.textContent = '結果を見る';
+    } else if (currentQuestionIndex < questions.length - 1) {
+        nextBtn.textContent = '次へ';
+    }
+}
+
+/**
+ * プログレスバーの表示を更新する
+ */
+function updateProgressBar() {
+    const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+    progressBarFill.style.width = `${progress}%`;
+}
+
+/**
+ * スコアを計算し、結果を判定する
+ * @returns {object} 性格タイプ、スコア詳細、おすすめ職種
+ */
+function calculateResult() {
+    // スコアを初期化
+    for (const key in scores) {
+        scores[key] = 0;
+    }
+
+    userAnswers.forEach(answer => {
+        for (const key in answer.score) {
+            if (scores.hasOwnProperty(key)) { // 定義されたスコア項目か確認
+                scores[key] += answer.score[key];
+            }
+        }
+    });
+
+    // スコアに基づいて性格タイプや適職を判定するロジック
+    // ここは非常にシンプルな例です。実際にはもっと複雑な判定ロジックが必要です。
+    let resultType = "タイプ未定";
+    let typeDescription = "あなたの強みや適性について、より詳しく分析します。";
+    let recommendation = ["サービス業（顧客対応）", "事務・管理部門"];
+
+    // 例：適応力とリーダーシップのスコアを重視
+    if (scores.adaptability >= 5 && scores.leadership >= 4) {
+        resultType = "変革推進リーダー型";
+        typeDescription = "新しい環境や変化を恐れず、チームを力強く牽引する能力に優れています。未経験の分野でも、持ち前の適応力とリーダーシップで道を切り開けるでしょう。";
+        recommendation = ["プロジェクトマネージャー", "新規事業開発責任者", "経営企画", "コンサルタント"];
+    } else if (scores.collaboration >= 4 && scores.communication >= 4) {
+        resultType = "協調性重視のチームプレイヤー型";
+        typeDescription = "他者との協調性を重んじ、円滑な人間関係を築きながら、チーム全体のパフォーマンス向上に貢献できます。傾聴力と共感力に優れています。";
+        recommendation = ["人事・採用担当", "カスタマーサクセス", "組織開発コンサルタント", "広報"];
+    } else if (scores.learning >= 4 && scores.problemSolving >= 3) {
+        resultType = "探求型問題解決スペシャリスト";
+        typeDescription = "常に新しい知識や技術の習得に意欲的で、複雑な問題を論理的に分析し、解決策を見つけ出すのが得意です。専門性を深めることで、大きな価値を発揮します。";
+        recommendation = ["研究開発", "システムエンジニア", "データアナリスト", "品質管理"];
+    } else if (scores.adaptability >= 0 && scores.problemSolving >= 0) {
+        resultType = "堅実な課題解決型";
+        typeDescription = "安定した環境で、着実に目の前の課題を解決していくことに長けています。豊富な経験を活かし、実務レベルで貢献できます。";
+        recommendation = ["経理・財務", "総務", "生産管理", "ベテラン技術職"];
+    }
+
+    return { type: resultType, description: typeDescription, scores: scores, jobs: recommendation };
+}
+
+/**
+ * 診断結果を表示する
+ */
+function showResult() {
+    quizArea.classList.add('hidden'); // 質問エリアを非表示に
+    resultArea.classList.remove('hidden'); // 結果エリアを表示に
+
+    const result = calculateResult(); // 結果を計算
+
+    // 結果エリアに内容を動的に挿入
+    resultArea.innerHTML = `
+        <h2 class="result-title">あなたのタイプは...</h2>
+        <p class="result-type-name">${result.type}！</p>
+        <p class="result-details">${result.description}</p>
+        
+        <h3 class="result-subtitle" style="color: #007bff; margin-top: 30px; margin-bottom: 15px;">おすすめの適職</h3>
+        <ul class="job-recommendation-list">
+            ${result.jobs.map(job => `<li>${job}</li>`).join('')}
+        </ul>
+        <p class="result-details" style="font-size: 0.9em; color: #777; margin-top: 30px;">
+            ※この診断は簡易版です。より詳細な診断や個別のキャリア相談をご希望の場合は、当社のサービスをご利用ください。
+        </p>
+    `;
+}
+
+// === イベントリスナーのセットアップ ===
+
+// 「前へ」ボタンのクリックイベント
+prevBtn.addEventListener('click', () => {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        loadQuestion();
+    }
+});
+
+// 「次へ」ボタンのクリックイベント
+nextBtn.addEventListener('click', () => {
+    // 現在の質問に回答が選択されているか確認
+    if (userAnswers[currentQuestionIndex] !== undefined) {
+        currentQuestionIndex++;
+        loadQuestion(); // 次の質問を読み込むか、結果を表示
+    } else {
+        alert('選択肢を一つ選んでください。'); // 回答がない場合はアラート
+    }
+});
+
+// === ページ読み込み時の初期処理 ===
+loadQuestion(); // 最初の質問をロード
